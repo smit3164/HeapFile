@@ -18,9 +18,11 @@ public class HeapFile implements GlobalConst {
    * creates a new empty file. A null name produces a temporary heap file which
    * requires no DB entry.
    */
-  //
-  int numRecords = 0;
-  boolean temporary = false;
+  // used to prevent 'name' being the same for 2 temporary files
+  static int tmpSuffix = 0;
+
+  int numRecords;
+  boolean temporary;
   private String name;
 
   public HeapFile(String name) {
@@ -31,10 +33,15 @@ public class HeapFile implements GlobalConst {
     if(name == null) {
       // make temp HeapFile w/o DB entry
       this.temporary = true;
+      this.name = ("tmp_" + tmpSuffix);
+      tmpSuffix++;
     } else if(/*name is the name of a file that exists*/) {
       //open file
     } else {
       // create a new empty file
+      this.numRecords = 0;
+      this.temporary = false;
+      this.name = name;
     }
   }
 
