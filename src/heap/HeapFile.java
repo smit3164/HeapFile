@@ -27,7 +27,8 @@ public class HeapFile implements GlobalConst {
     private PageId fPageId;
     private Page fPage;
     private HFPage hfPage;
-    private ArrayList<PageId> pageIds;
+    public ArrayList<PageId> pageIds;
+    // TODO: Implement hashing
 
     public HeapFile(String name) throws ChainException {
         this.name = name;
