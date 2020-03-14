@@ -22,19 +22,19 @@ public class HeapFile implements GlobalConst {
      */
 
     int numRecords;
-    boolean temporary = false;
+    boolean temporary;
     private String name;
     private PageId fPageId;
     private Page fPage;
     private HFPage hfPage;
 
-    private ArrayList<Page> pages;
     private ArrayList<PageId> pageIds;
 
     public HeapFile(String name) {
         this.name = name;
+        this.numRecords = 0;
+        this.temporary = false;
         this.hfPage = new HFPage();
-        pages = new ArrayList<>();
         pageIds = new ArrayList<>();
 
         if(name == null) {
@@ -50,11 +50,10 @@ public class HeapFile implements GlobalConst {
 
             // Add allocated page to heap file
             this.hfPage.setCurPage(fPageId);
-        } else {
-            // create a new empty file
-            this.numRecords = 0;
-            this.name = name;
 
+            // Add pageId to array
+            this.pageIds.add(this.fPageId);
+        } else {
             this.fPageId = Minibase.DiskManager.get_file_entry(name);
 
             // If file doesn't exist, make a new (temporary?) one
@@ -66,16 +65,30 @@ public class HeapFile implements GlobalConst {
                 // Use the given name since it already doesn't exist
                 Minibase.DiskManager.add_file_entry(this.name, this.fPageId);
 
-                // TODO: Check if this behavior is correct
-                Minibase.DiskManager.read_page(this.fPageId, this.fPage);
+                // Pin to associate fPage
+                Minibase.BufferManager.pinPage(this.fPageId, this.fPage, false);
+
+                // Add pageId to array
+                this.pageIds.add(this.fPageId);
+
+                // Add allocated page to heap file
+                this.hfPage.setCurPage(this.fPageId);
+
+                Minibase.BufferManager.unpinPage(this.fPageId, false);
+
+                return;
             }
 
-            // Add page and pageId to arrays
-            this.pages.add(this.fPage);
+            // Pin to associate fPage
+            Minibase.BufferManager.pinPage(this.fPageId, this.fPage, false);
+
+            // Add pageId to array
             this.pageIds.add(this.fPageId);
 
             // Add allocated page to heap file
             this.hfPage.setCurPage(this.fPageId);
+
+            Minibase.BufferManager.unpinPage(this.fPageId, false);
         }
     }
 
@@ -85,6 +98,9 @@ public class HeapFile implements GlobalConst {
      */
     protected void finalize() throws Throwable {
         // TODO delete heapFile
+        if (temporary) {
+            deleteFile();
+        }
     }
 
     /**
@@ -102,7 +118,6 @@ public class HeapFile implements GlobalConst {
         }
 
         numRecords = 0;
-        pages.clear();
         pageIds.clear();
 
         // Delete heap file itself?
@@ -114,21 +129,46 @@ public class HeapFile implements GlobalConst {
      * @throws IllegalArgumentException if the record is too large
      */
     public RID insertRecord(byte[] record) throws Exception {
-        //PUT YOUR CODE HERE
-        // if record is too large, throw IllegalArgumentException
-        // TODO create Tuple from byte array
-        try {
-            if(record.length > MAX_TUPSIZE) {
-                // TODO not sure if MAX_TUPSIZE is the correct thing to compare to
-                throw new IllegalArgumentException("argument 'record' is larger than MAX_TUPSIZE");
-            }
-            // TODO add Tuple to heapFile
-            this.numRecords++;
-            return null;  // TODO return rid, not null
-        } catch(IllegalArgumentException e) {
-            e.printStackTrace();
+        if(record.length > MAX_TUPSIZE) {
+            throw new IllegalArgumentException("HeapFile.insertRecord: Argument 'record' is larger than MAX_TUPSIZE");
         }
-        return null;
+
+        // Check each page
+        for (int pid = 0; pid < pageIds.size(); pid++) {
+            Page page = new Page();
+            Minibase.BufferManager.pinPage(pageIds.get(pid), page, false);
+
+            HFPage hf = new HFPage(page);
+
+            if (hf.getFreeSpace() > record.length) {
+                RID r = this.hfPage.insertRecord(record);
+                this.numRecords++;
+                Minibase.BufferManager.unpinPage(pageIds.get(pid), true);
+                return r;
+            }
+
+            Minibase.BufferManager.unpinPage(pageIds.get(pid), true);
+        }
+
+        Page page = new Page();
+        PageId pageId = Minibase.BufferManager.newPage(page, 1);
+        HFPage hf = new HFPage(page);
+
+        Minibase.BufferManager.pinPage(pageId, page, false);
+
+        pageIds.add(pageId);
+
+        // Add links between the current and new page
+        hf.setPrevPage(this.hfPage.getCurPage());
+        this.hfPage.setNextPage(pageId);
+        this.hfPage = hf;
+
+        // Add record to new page
+        RID r = this.hfPage.insertRecord(record);
+
+        Minibase.BufferManager.unpinPage(pageId, false);
+
+        return r;
     }
 
     /**
@@ -137,11 +177,13 @@ public class HeapFile implements GlobalConst {
      * @throws IllegalArgumentException if the rid is invalid
      */
     public Tuple getRecord(RID rid) throws ChainException {
+        if (!pageIds.contains(rid.pageno)) {
+            throw new IllegalArgumentException("HeapFile.deleteRecord: Invalid RID");
+        }
+
         byte[] record;
         short offset;
         short length;
-
-        // TODO: Check arguments
 
         try {
             record = this.hfPage.selectRecord(rid);
@@ -160,22 +202,17 @@ public class HeapFile implements GlobalConst {
      * @throws IllegalArgumentException if the rid or new record is invalid
      */
     public boolean updateRecord(RID rid, Tuple newRecord) throws ChainException {
-        // TODO: Check arguments
+        if (!pageIds.contains(rid.pageno)) {
+            throw new IllegalArgumentException("HeapFile.deleteRecord: Invalid RID");
+        }
 
         try {
-            if(/*rid is invalid*/) {
-                throw new IllegalArgumentException("invalid rid argument");
-            }
-            if (/*newRecord is invalid*/) {
-                throw new IllegalArgumentException("invalid newRecord argument");
-            }
-            Tuple tuple = getRecord(rid);
-            // TODO update record
-            return true;
-        } catch(IllegalArgumentException e) {
-            e.printStackTrace();
+            this.hfPage.updateRecord(rid, newRecord);
+        } catch (Exception e) {
+            return false;
         }
-        return false;
+
+        return true;
     }
 
     /**
@@ -184,7 +221,9 @@ public class HeapFile implements GlobalConst {
      * @throws IllegalArgumentException if the rid is invalid
      */
     public boolean deleteRecord(RID rid) throws IllegalArgumentException {
-        // TODO: Check arguments
+        if (!pageIds.contains(rid.pageno)) {
+            throw new IllegalArgumentException("HeapFile.deleteRecord: Invalid RID");
+        }
 
         try {
             //if RID is invalid, throw IllegalArgumentException
