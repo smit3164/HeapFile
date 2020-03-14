@@ -29,22 +29,23 @@ public class HeapFile implements GlobalConst {
     private HFPage hfPage;
     private ArrayList<PageId> pageIds;
 
-    public HeapFile(String name) {
+    public HeapFile(String name) throws ChainException {
         this.name = name;
         this.numRecords = 0;
         this.temporary = false;
+        this.fPage = new Page();
         this.hfPage = new HFPage();
         pageIds = new ArrayList<>();
 
+        // Create a new page if no filename is given
         if(name == null) {
             this.temporary = true;
             this.fPageId = new PageId();
-            this.fPage = new Page();
 
             try {
                 this.fPageId = Minibase.BufferManager.newPage(this.fPage, 1);
             } catch (Exception e) {
-                // TODO: Verify this is correct
+                throw new ChainException(null, "HeapFile.HeapFile: Failed to allocate a new page");
             }
 
             // Add allocated page to heap file
@@ -52,34 +53,19 @@ public class HeapFile implements GlobalConst {
 
             // Add pageId to array
             this.pageIds.add(this.fPageId);
-        } else {
-            this.fPageId = Minibase.DiskManager.get_file_entry(name);
 
-            // If file doesn't exist, make a new (temporary?) one
-            if (fPageId == null) {
-                this.temporary = true;
-                this.fPageId = new PageId();
-                this.fPage = new Page();
+            return;
+        }
 
-                // Use the given name since it already doesn't exist
-                Minibase.DiskManager.add_file_entry(this.name, this.fPageId);
+        this.fPageId = Minibase.DiskManager.get_file_entry(name);
 
-                // Pin to associate fPage
-                Minibase.BufferManager.pinPage(this.fPageId, this.fPage, false);
+        // If file doesn't exist, make a new (temporary?) one
+        if (fPageId == null) {
+            this.temporary = true;
+            this.fPageId = Minibase.BufferManager.newPage(this.fPage, 1);
 
-                // Add pageId to array
-                this.pageIds.add(this.fPageId);
-
-                // Add allocated page to heap file
-                this.hfPage.setCurPage(this.fPageId);
-
-                Minibase.BufferManager.unpinPage(this.fPageId, false);
-
-                return;
-            }
-
-            // Pin to associate fPage
-            Minibase.BufferManager.pinPage(this.fPageId, this.fPage, false);
+            // Use the given name since it already doesn't exist
+            Minibase.DiskManager.add_file_entry(this.name, this.fPageId);
 
             // Add pageId to array
             this.pageIds.add(this.fPageId);
@@ -88,7 +74,20 @@ public class HeapFile implements GlobalConst {
             this.hfPage.setCurPage(this.fPageId);
 
             Minibase.BufferManager.unpinPage(this.fPageId, false);
+
+            return;
         }
+
+        // Pin to associate fPage
+        Minibase.BufferManager.pinPage(this.fPageId, this.fPage, false);
+
+        // Add pageId to array
+        this.pageIds.add(this.fPageId);
+
+        // Add allocated page to heap file
+        this.hfPage.setCurPage(this.fPageId);
+
+        Minibase.BufferManager.unpinPage(this.fPageId, false);
     }
 
     /**
@@ -118,7 +117,6 @@ public class HeapFile implements GlobalConst {
         pageIds.clear();
         hfPage = null;
 
-        // TODO: Check this functionality
         Minibase.DiskManager.delete_file_entry(this.name);
     }
 
@@ -180,14 +178,22 @@ public class HeapFile implements GlobalConst {
             throw new IllegalArgumentException("HeapFile.deleteRecord: Invalid RID");
         }
 
+        Page page = new Page();
+        HFPage hf = new HFPage();
         byte[] record;
         short offset;
         short length;
 
         try {
-            record = this.hfPage.selectRecord(rid);
-            offset = this.hfPage.getSlotOffset(rid.slotno);
-            length = this.hfPage.checkRID(rid);
+            Minibase.BufferManager.pinPage(rid.pageno, page, false);
+
+            hf.copyPage(page);
+
+            record = hf.selectRecord(rid);
+            offset = hf.getSlotOffset(rid.slotno);
+            length = hf.checkRID(rid);
+
+            Minibase.BufferManager.unpinPage(rid.pageno, false);
         } catch(Exception e) {
             throw new ChainException(null, "HeapFile.getRecord: Failed to retrieve record from HFPage");
         }

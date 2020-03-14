@@ -3,7 +3,6 @@ package heap;
 import java.util.*;
 import global.* ;
 import chainexception.ChainException;
-import jdk.dynalink.support.ChainedCallSite;
 
 /**
  * A HeapScan object is created only through the function openScan() in the

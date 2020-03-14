@@ -781,19 +781,75 @@ class HFDriver extends TestDriver implements GlobalConst
 	}
 
 	protected boolean test6 () {
+		System.out.println ("\n  Test 6: Test basic functionality\n");
+		boolean status = OK;
+		RID rid = new RID();
+		HeapFile f = null;
 
-		return true;
+		System.out.println ("  - Create a heap file\n");
+		try {
+			f = new HeapFile("file_1");
+		}
+		catch (Exception e) {
+			status = FAIL;
+			System.err.println ("*** Could not create heap file\n");
+			e.printStackTrace();
+		}
+
+		if (status == OK && Minibase.BufferManager.getNumUnpinned() != Minibase.BufferManager.getNumBuffers()) {
+			System.err.println ("*** The heap file has left pages pinned\n");
+			status = FAIL;
+		}
+
+		if (status == OK) {
+			System.out.println ("  - Add " + choice + " records to the file\n");
+
+			for (int i = 0; i < choice && status == OK; i++) {
+				DummyRecord rec = new DummyRecord(reclen);
+				rec.ival = i;
+				rec.fval = (float) (i*2.5);
+				rec.name = "record" + i;
+
+				try {
+					rid = f.insertRecord(rec.toByteArray());
+				}
+				catch (Exception e) {
+					status = FAIL;
+					System.err.println ("*** Error inserting record " + i + "\n");
+					e.printStackTrace();
+				}
+
+				if (status == OK && Minibase.BufferManager.getNumUnpinned() != Minibase.BufferManager.getNumBuffers()) {
+					System.err.println ("*** Insertion left a page pinned\n");
+					status = FAIL;
+				}
+			}
+
+			try {
+				if (f.getRecCnt() != choice) {
+					status = FAIL;
+					System.err.println("*** File reports " + f.getRecCnt() + " records, not " + choice + "\n");
+				}
+			}
+			catch (Exception e) {
+				status = FAIL;
+				System.out.println("" + e);
+				e.printStackTrace();
+			}
+		}
+
+		return status;
 	}
 
 	protected boolean runAllTests (){
 
 		boolean _passAll = OK;
 
-		if (!test1()) { _passAll = FAIL; }
-		if (!test2()) { _passAll = FAIL; }
-		if (!test3()) { _passAll = FAIL; }
-		if (!test4()) { _passAll = FAIL; }
-		if (!test5()) { _passAll = FAIL; }
+//		if (!test1()) { _passAll = FAIL; }
+//		if (!test2()) { _passAll = FAIL; }
+//		if (!test3()) { _passAll = FAIL; }
+//		if (!test4()) { _passAll = FAIL; }
+//		if (!test5()) { _passAll = FAIL; }
 		if (!test6()) { _passAll = FAIL; }
 
 		return _passAll;
