@@ -54,6 +54,8 @@ public class HeapFile implements GlobalConst {
             // Add pageId to array
             this.pageIds.add(this.fPageId);
 
+            Minibase.BufferManager.unpinPage(this.fPageId, false);
+
             return;
         }
 
@@ -151,8 +153,6 @@ public class HeapFile implements GlobalConst {
         PageId pageId = Minibase.BufferManager.newPage(page, 1);
         HFPage hf = new HFPage(page);
 
-        Minibase.BufferManager.pinPage(pageId, page, false);
-
         pageIds.add(pageId);
 
         // Add links between the current and new page
@@ -165,6 +165,8 @@ public class HeapFile implements GlobalConst {
 
         Minibase.BufferManager.unpinPage(pageId, false);
 
+        this.numRecords++;
+
         return r;
     }
 
@@ -173,7 +175,7 @@ public class HeapFile implements GlobalConst {
      *
      * @throws IllegalArgumentException if the rid is invalid
      */
-    public Tuple getRecord(RID rid) throws ChainException {
+    public Tuple getRecord(RID rid) throws Exception {
         if (!pageIds.contains(rid.pageno)) {
             throw new IllegalArgumentException("HeapFile.deleteRecord: Invalid RID");
         }
@@ -206,7 +208,7 @@ public class HeapFile implements GlobalConst {
      *
      * @throws IllegalArgumentException if the rid or new record is invalid
      */
-    public boolean updateRecord(RID rid, Tuple newRecord) throws ChainException {
+    public boolean updateRecord(RID rid, Tuple newRecord) throws Exception {
         if (!pageIds.contains(rid.pageno)) {
             throw new IllegalArgumentException("HeapFile.deleteRecord: Invalid RID");
         }
@@ -233,7 +235,7 @@ public class HeapFile implements GlobalConst {
      *
      * @throws IllegalArgumentException if the rid is invalid
      */
-    public boolean deleteRecord(RID rid) throws IllegalArgumentException {
+    public boolean deleteRecord(RID rid) throws Exception {
         if (!pageIds.contains(rid.pageno)) {
             throw new IllegalArgumentException("HeapFile.deleteRecord: Invalid RID");
         }
