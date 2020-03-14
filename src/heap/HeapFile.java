@@ -1,7 +1,7 @@
 package heap;
 
-import global.GlobalConst;
-import global.RID;
+import chainexception.ChainException;
+import global.*;
 
 /**
  * <h3>Minibase Heap Files</h3>
@@ -13,166 +13,195 @@ import global.RID;
  */
 public class HeapFile implements GlobalConst {
 
-  /**
-   * If the given name already denotes a file, this opens it; otherwise, this
-   * creates a new empty file. A null name produces a temporary heap file which
-   * requires no DB entry.
-   */
-  // used to prevent 'name' being the same for 2 temporary files
-  static int tmpSuffix = 0;
+    /**
+     * If the given name already denotes a file, this opens it; otherwise, this
+     * creates a new empty file. A null name produces a temporary heap file which
+     * requires no DB entry.
+     */
+    // used to prevent 'name' being the same for 2 temporary files
+    static int tmpSuffix = 0;
 
-  int numRecords;
-  boolean temporary;
-  private String name;
+    int numRecords;
+    boolean temporary;
+    private String name;
+    private PageId fPageId;
+    private Page fPage;
+    private HFPage hfPage;
 
-  public HeapFile(String name) {
-    // call allocate_page
-      //PUT YOUR CODE HERE
-    // TODO
-    this.name = name;
-    if(name == null) {
-      // make temp HeapFile w/o DB entry
-      this.temporary = true;
-      this.name = ("tmp_" + tmpSuffix);
-      tmpSuffix++;
-    } else if(/*name is the name of a file that exists*/) {
-      //open file
-    } else {
-      // create a new empty file
-      this.numRecords = 0;
-      this.temporary = false;
-      this.name = name;
+    public HeapFile(String name) {
+        this.name = name;
+        this.hfPage = new HFPage();
+
+        if(name == null) {
+            // make temp HeapFile w/o DB entry
+            this.temporary = true;
+            this.name = ("tmp_" + tmpSuffix);
+            tmpSuffix++;
+
+            this.fPageId = new PageId();
+            this.fPage = new Page();
+
+            try {
+                this.fPageId = Minibase.BufferManager.newPage(this.fPage, 1);
+            } catch (Exception e) {
+                // TODO: Verify this is correct
+            }
+
+            // Add allocated page to heap file
+            this.hfPage.setCurPage(fPageId);
+        } else {
+            // create a new empty file
+            this.numRecords = 0;
+            this.temporary = false;
+            this.name = name;
+
+            this.fPageId = Minibase.DiskManager.get_file_entry(name);
+
+            // If file doesn't exist, make a new one
+            if (fPageId == null) {
+                this.fPageId = new PageId();
+                this.fPage = new Page();
+
+                try {
+                    this.fPageId = Minibase.BufferManager.newPage(this.fPage, 1);
+                } catch (Exception e) {
+                    // TODO: Verify this is correct
+                }
+            }
+
+            // Add allocated page to heap file
+            this.hfPage.setCurPage(this.fPageId);
+        }
     }
-  }
 
-  /**
-   * Called by the garbage collector when there are no more references to the
-   * object; deletes the heap file if it's temporary.
-   */
-  protected void finalize() throws Throwable {
-      //PUT YOUR CODE HERE
-    if(this.temporary) {
-      // TODO delete heapFile
+    /**
+     * Called by the garbage collector when there are no more references to the
+     * object; deletes the heap file if it's temporary.
+     */
+    protected void finalize() throws Throwable {
+        //PUT YOUR CODE HERE
+        if(this.temporary) {
+            // TODO delete heapFile
+        }
     }
-  }
 
-  /**
-   * Deletes the heap file from the database, freeing all of its pages.
-   */
-  public void deleteFile() {
-    //PUT YOUR CODE HERE
-    // TODO free all pages
-    // TODO delete heapFile
-  }
-
-  /**
-   * Inserts a new record into the file and returns its RID.
-   * 
-   * @throws IllegalArgumentException if the record is too large
-   */
-  public RID insertRecord(byte[] record) throws Exception {
-    //PUT YOUR CODE HERE
-    // if record is too large, throw IllegalArgumentException
-    // TODO create Tuple from byte array
-    try {
-      if(record.length > MAX_TUPSIZE) {
-        // TODO not sure if MAX_TUPSIZE is the correct thing to compare to
-        throw new IllegalArgumentException("argument 'record' is larger than MAX_TUPSIZE");
-      }
-      // TODO add Tuple to heapFile
-      this.numRecords++;
-      return null;  // TODO return rid, not null
-    } catch(IllegalArgumentException e) {
-      e.printStackTrace();
+    /**
+     * Deletes the heap file from the database, freeing all of its pages.
+     */
+    public void deleteFile() {
+        //PUT YOUR CODE HERE
+        // TODO free all pages
+        // TODO delete heapFile
     }
-    return null;
-  }
 
-  /**
-   * Reads a record from the file, given its id.
-   * 
-   * @throws IllegalArgumentException if the rid is invalid
-   */
-  public Tuple getRecord(RID rid) throws Exception {
-    //PUT YOUR CODE HERE
-    // if invalid RID, throw IllegalArgumentException
-    try {
-      if(/*rid is invalid*/) {
-        throw new IllegalArgumentException("invalid rid argument");
-      }
-      // TODO get Tuple from rid
-      return null;  // TODO return Tuple, not null
-    } catch(IllegalArgumentException e) {
-      e.printStackTrace();
+    /**
+     * Inserts a new record into the file and returns its RID.
+     *
+     * @throws IllegalArgumentException if the record is too large
+     */
+    public RID insertRecord(byte[] record) throws Exception {
+        //PUT YOUR CODE HERE
+        // if record is too large, throw IllegalArgumentException
+        // TODO create Tuple from byte array
+        try {
+            if(record.length > MAX_TUPSIZE) {
+                // TODO not sure if MAX_TUPSIZE is the correct thing to compare to
+                throw new IllegalArgumentException("argument 'record' is larger than MAX_TUPSIZE");
+            }
+            // TODO add Tuple to heapFile
+            this.numRecords++;
+            return null;  // TODO return rid, not null
+        } catch(IllegalArgumentException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
-    return null;
-  }
 
-  /**
-   * Updates the specified record in the heap file.
-   * 
-   * @throws IllegalArgumentException if the rid or new record is invalid
-   */
-  public boolean updateRecord(RID rid, Tuple newRecord) throws Exception {
-    //PUT YOUR CODE HERE
-    try {
-      if(/*rid is invalid*/) {
-        throw new IllegalArgumentException("invalid rid argument");
-      }
-      if (/*newRecord is invalid*/) {
-        throw new IllegalArgumentException("invalid newRecord argument");
-      }
-      Tuple tuple = getRecord(rid);
-      // TODO update record
-      return true;
-    } catch(IllegalArgumentException e) {
-      e.printStackTrace();
+    /**
+     * Reads a record from the file, given its id.
+     *
+     * @throws IllegalArgumentException if the rid is invalid
+     */
+    public Tuple getRecord(RID rid) throws Exception {
+        //PUT YOUR CODE HERE
+        // if invalid RID, throw IllegalArgumentException
+        try {
+            if(/*rid is invalid*/) {
+                throw new IllegalArgumentException("invalid rid argument");
+            }
+            // TODO get Tuple from rid
+            return null;  // TODO return Tuple, not null
+        } catch(IllegalArgumentException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
-    return false;
-  }
 
-  /**
-   * Deletes the specified record from the heap file.
-   * 
-   * @throws IllegalArgumentException if the rid is invalid
-   */
-  public boolean deleteRecord(RID rid) throws IllegalArgumentException {
-    //PUT YOUR CODE HERE
-    try {
-      //if RID is invalid, throw IllegalArgumentException
-      if(/*rid is invalid*/) {
-        throw new IllegalArgumentException("invalid rid argument");
-      }
-      // TODO delete record from heapFile
-      this.numRecords--;
-      return true;
-    } catch(IllegalArgumentException e) {
-      e.printStackTrace();
+    /**
+     * Updates the specified record in the heap file.
+     *
+     * @throws IllegalArgumentException if the rid or new record is invalid
+     */
+    public boolean updateRecord(RID rid, Tuple newRecord) throws Exception {
+        //PUT YOUR CODE HERE
+        try {
+            if(/*rid is invalid*/) {
+                throw new IllegalArgumentException("invalid rid argument");
+            }
+            if (/*newRecord is invalid*/) {
+                throw new IllegalArgumentException("invalid newRecord argument");
+            }
+            Tuple tuple = getRecord(rid);
+            // TODO update record
+            return true;
+        } catch(IllegalArgumentException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
-    return false;
-  }
 
-  /**
-   * Gets the number of records in the file.
-   */
-  public int getRecCnt() {
-    //PUT YOUR CODE HERE
-    return this.numRecords;
-  }
+    /**
+     * Deletes the specified record from the heap file.
+     *
+     * @throws IllegalArgumentException if the rid is invalid
+     */
+    public boolean deleteRecord(RID rid) throws IllegalArgumentException {
+        //PUT YOUR CODE HERE
+        try {
+            //if RID is invalid, throw IllegalArgumentException
+            if(/*rid is invalid*/) {
+                throw new IllegalArgumentException("invalid rid argument");
+            }
+            // TODO delete record from heapFile
+            this.numRecords--;
+            return true;
+        } catch(IllegalArgumentException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
 
-  /**
-   * Initiates a sequential scan of the heap file.
-   */
-  public HeapScan openScan() {
-    return new HeapScan(this);
-  }
+    /**
+     * Gets the number of records in the file.
+     */
+    public int getRecCnt() {
+        //PUT YOUR CODE HERE
+        return this.numRecords;
+    }
 
-  /**
-   * Returns the name of the heap file.
-   */
-  public String toString() {
-    //PUT YOUR CODE HERE
-    return this.name;
-  }
+    /**
+     * Initiates a sequential scan of the heap file.
+     */
+    public HeapScan openScan() {
+        return new HeapScan(this);
+    }
+
+    /**
+     * Returns the name of the heap file.
+     */
+    public String toString() {
+        //PUT YOUR CODE HERE
+        return this.name;
+    }
 
 } // public class HeapFile implements GlobalConst
