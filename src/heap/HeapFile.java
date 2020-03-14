@@ -147,12 +147,14 @@ public class HeapFile implements GlobalConst {
                 return r;
             }
 
-            Minibase.BufferManager.unpinPage(pageIds.get(pid), true);
+            Minibase.BufferManager.unpinPage(pageIds.get(pid), false);
         }
 
         Page page = new Page();
         PageId pageId = Minibase.BufferManager.newPage(page, 1);
         HFPage hf = new HFPage(page);
+        hf.initDefaults();
+        hf.setCurPage(pageId);
 
         pageIds.add(pageId);
 
@@ -164,7 +166,7 @@ public class HeapFile implements GlobalConst {
         // Add record to new page
         RID r = this.hfPage.insertRecord(record);
 
-        Minibase.BufferManager.unpinPage(pageId, false);
+        Minibase.BufferManager.unpinPage(pageId, true);
 
         this.numRecords++;
 
@@ -178,7 +180,7 @@ public class HeapFile implements GlobalConst {
      */
     public Tuple getRecord(RID rid) throws Exception {
         if (!pageIds.contains(rid.pageno)) {
-            throw new IllegalArgumentException("HeapFile.deleteRecord: Invalid RID");
+            throw new IllegalArgumentException("HeapFile.getRecord: Invalid RID");
         }
 
         Page page = new Page();
@@ -211,7 +213,7 @@ public class HeapFile implements GlobalConst {
      */
     public boolean updateRecord(RID rid, Tuple newRecord) throws Exception {
         if (!pageIds.contains(rid.pageno)) {
-            throw new IllegalArgumentException("HeapFile.deleteRecord: Invalid RID");
+            throw new IllegalArgumentException("HeapFile.updateRecord: Invalid RID");
         }
 
         Page page = new Page();

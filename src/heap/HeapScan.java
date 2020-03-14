@@ -16,6 +16,7 @@ public class HeapScan implements GlobalConst {
     RID record;
     ArrayList<PageId> pageIds;
     int pageIdIndex = 0;
+    boolean open;
 
     /**
      * Constructs a file scan by pinning the directory header page and initializing
@@ -28,6 +29,7 @@ public class HeapScan implements GlobalConst {
         hfPage = new HFPage();
 
         Minibase.BufferManager.pinPage(pageIds.get(pageIdIndex), hfPage, false);
+        open = true;
 
         record = hfPage.firstRecord();
     }
@@ -48,7 +50,7 @@ public class HeapScan implements GlobalConst {
      * Closes the file scan, releasing any pinned pages.
      */
     public void close() throws ChainException{
-        Minibase.BufferManager.unpinPage(pageIds.get(pageIdIndex), false);
+        if (open) Minibase.BufferManager.unpinPage(pageIds.get(pageIdIndex), false);
     }
 
     /**
@@ -80,19 +82,16 @@ public class HeapScan implements GlobalConst {
 
             record = hfPage.firstRecord();
 
-            // Found end of records
-            if (record == null) {
-                Minibase.BufferManager.unpinPage(pageIds.get(pageIdIndex), false);
-                return null;
+            if (record != null) {
+                rid.copyRID(record);
+                record = hfPage.nextRecord(record);
+
+                return new Tuple(hfPage.selectRecord(rid), 0, hfPage.selectRecord(rid).length);
             }
-
-            rid.copyRID(record);
-            record = hfPage.nextRecord(record);
-
-            return new Tuple(hfPage.selectRecord(rid), 0, hfPage.selectRecord(rid).length);
         }
 
         Minibase.BufferManager.unpinPage(pageIds.get(pageIdIndex), false);
+        open = false;
 
         return null;
     }
