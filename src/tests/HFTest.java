@@ -631,6 +631,28 @@ class HFDriver extends TestDriver implements GlobalConst
 			e.printStackTrace();
 		}
 
+        // Insert our own records because file_1 is missing????
+        for (int i = 0; i < choice && status == OK; i++) {
+            DummyRecord rec = new DummyRecord(reclen);
+            rec.ival = i;
+            rec.fval = (float) (i*2.5);
+            rec.name = "record" + i;
+
+            try {
+                rid = f.insertRecord(rec.toByteArray());
+            }
+            catch (Exception e) {
+                status = FAIL;
+                System.err.println ("*** Error inserting record " + i + "\n");
+                e.printStackTrace();
+            }
+
+            if (status == OK && Minibase.BufferManager.getNumUnpinned() != Minibase.BufferManager.getNumBuffers()) {
+                System.err.println ("*** Insertion left a page pinned\n");
+                status = FAIL;
+            }
+        }
+
 		if ( status == OK ) {
 			System.out.println ("  - Try to change the size of a record\n");
 			try {
@@ -846,11 +868,11 @@ class HFDriver extends TestDriver implements GlobalConst
 
 		boolean _passAll = OK;
 
-//		if (!test1()) { _passAll = FAIL; }
-//		if (!test2()) { _passAll = FAIL; }
-//		if (!test3()) { _passAll = FAIL; }
+		if (!test1()) { _passAll = FAIL; }
+		if (!test2()) { _passAll = FAIL; }
+		if (!test3()) { _passAll = FAIL; }
 		if (!test4()) { _passAll = FAIL; }
-//		if (!test5()) { _passAll = FAIL; }
+		if (!test5()) { _passAll = FAIL; }
 //		if (!test6()) { _passAll = FAIL; }
 
 		return _passAll;

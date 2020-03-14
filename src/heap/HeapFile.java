@@ -130,7 +130,7 @@ public class HeapFile implements GlobalConst {
      */
     public RID insertRecord(byte[] record) throws Exception {
         if(record.length > MAX_TUPSIZE) {
-            throw new IllegalArgumentException("HeapFile.insertRecord: Argument 'record' is larger than MAX_TUPSIZE");
+            throw new SpaceNotAvailableException(null, "HeapFile.insertRecord: Argument 'record' is larger than MAX_TUPSIZE");
         }
 
         // Check each page
