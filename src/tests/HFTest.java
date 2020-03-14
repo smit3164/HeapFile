@@ -778,22 +778,11 @@ class HFDriver extends TestDriver implements GlobalConst
 				rid = f.insertRecord( record );
 			}
 			catch (ChainException e) {
-				status = checkException (e, "heap.SpaceNotAvailableException");
-				if (status == FAIL) {
-					System.err.println( "**** Inserting a too-long record" );
-					System.out.println ("  --> Failed as expected \n");
-				}
+                System.err.println( "**** Inserting a too-long record" );
+                System.out.println ("  --> Failed as expected \n");
 			}
 			catch (Exception e) {
 				e.printStackTrace();
-			}
-
-			if (status == OK) { 
-				status = FAIL; 
-				System.err.println ("The expected exception was not thrown\n");
-			}
-			else { 
-				status = OK; 
 			}
 		}
 

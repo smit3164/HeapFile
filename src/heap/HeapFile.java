@@ -4,6 +4,7 @@ import chainexception.ChainException;
 import global.*;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 
 /**
  * <h3>Minibase Heap Files</h3>
@@ -28,7 +29,7 @@ public class HeapFile implements GlobalConst {
     private Page fPage;
     private HFPage hfPage;
     public ArrayList<PageId> pageIds;
-    // TODO: Implement hashing
+    private HashSet<PageId> pHash;
 
     public HeapFile(String name) throws ChainException {
         this.name = name;
@@ -37,6 +38,7 @@ public class HeapFile implements GlobalConst {
         this.fPage = new Page();
         this.hfPage = new HFPage();
         pageIds = new ArrayList<>();
+        pHash = new HashSet<>();
 
         // Create a new page if no filename is given
         if(name == null) {
@@ -54,6 +56,7 @@ public class HeapFile implements GlobalConst {
 
             // Add pageId to array
             this.pageIds.add(this.fPageId);
+            this.pHash.add(this.fPageId);
 
             Minibase.BufferManager.unpinPage(this.fPageId, false);
 
@@ -72,6 +75,7 @@ public class HeapFile implements GlobalConst {
 
             // Add pageId to array
             this.pageIds.add(this.fPageId);
+            this.pHash.add(this.fPageId);
 
             // Add allocated page to heap file
             this.hfPage.setCurPage(this.fPageId);
@@ -86,6 +90,7 @@ public class HeapFile implements GlobalConst {
 
         // Add pageId to array
         this.pageIds.add(this.fPageId);
+        this.pHash.add(this.fPageId);
 
         // Add allocated page to heap file
         this.hfPage.setCurPage(this.fPageId);
@@ -118,6 +123,7 @@ public class HeapFile implements GlobalConst {
 
         numRecords = 0;
         pageIds.clear();
+        pHash.clear();
         hfPage = null;
 
         Minibase.DiskManager.delete_file_entry(this.name);
@@ -130,7 +136,7 @@ public class HeapFile implements GlobalConst {
      */
     public RID insertRecord(byte[] record) throws Exception {
         if(record.length > MAX_TUPSIZE) {
-            throw new SpaceNotAvailableException(null, "HeapFile.insertRecord: Argument 'record' is larger than MAX_TUPSIZE");
+            throw new ChainException(null, "HeapFile.insertRecord: Argument 'record' is larger than MAX_TUPSIZE");
         }
 
         // Check each page
@@ -157,6 +163,7 @@ public class HeapFile implements GlobalConst {
         hf.setCurPage(pageId);
 
         pageIds.add(pageId);
+        pHash.add(pageId);
 
         // Add links between the current and new page
         hf.setPrevPage(this.hfPage.getCurPage());
@@ -179,8 +186,8 @@ public class HeapFile implements GlobalConst {
      * @throws IllegalArgumentException if the rid is invalid
      */
     public Tuple getRecord(RID rid) throws Exception {
-        if (!pageIds.contains(rid.pageno)) {
-            throw new IllegalArgumentException("HeapFile.getRecord: Invalid RID");
+        if (!pHash.contains(rid.pageno)) {
+            throw new ChainException(null, "HeapFile.getRecord: Invalid RID");
         }
 
         Page page = new Page();
@@ -212,8 +219,8 @@ public class HeapFile implements GlobalConst {
      * @throws IllegalArgumentException if the rid or new record is invalid
      */
     public boolean updateRecord(RID rid, Tuple newRecord) throws Exception {
-        if (!pageIds.contains(rid.pageno)) {
-            throw new IllegalArgumentException("HeapFile.updateRecord: Invalid RID");
+        if (!pHash.contains(rid.pageno)) {
+            throw new ChainException(null, "HeapFile.updateRecord: Invalid RID");
         }
 
         Page page = new Page();
@@ -239,8 +246,8 @@ public class HeapFile implements GlobalConst {
      * @throws IllegalArgumentException if the rid is invalid
      */
     public boolean deleteRecord(RID rid) throws Exception {
-        if (!pageIds.contains(rid.pageno)) {
-            throw new IllegalArgumentException("HeapFile.deleteRecord: Invalid RID");
+        if (!pHash.contains(rid.pageno)) {
+            throw new ChainException(null, "HeapFile.deleteRecord: Invalid RID");
         }
 
         Page page = new Page();
