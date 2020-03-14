@@ -3,6 +3,8 @@ package heap;
 import chainexception.ChainException;
 import global.*;
 
+import java.util.ArrayList;
+
 /**
  * <h3>Minibase Heap Files</h3>
  * A heap file is an unordered set of records, stored on a set of pages. This
@@ -18,26 +20,25 @@ public class HeapFile implements GlobalConst {
      * creates a new empty file. A null name produces a temporary heap file which
      * requires no DB entry.
      */
-    // used to prevent 'name' being the same for 2 temporary files
-    static int tmpSuffix = 0;
 
     int numRecords;
-    boolean temporary;
+    boolean temporary = false;
     private String name;
     private PageId fPageId;
     private Page fPage;
     private HFPage hfPage;
 
+    private ArrayList<Page> pages;
+    private ArrayList<PageId> pageIds;
+
     public HeapFile(String name) {
         this.name = name;
         this.hfPage = new HFPage();
+        pages = new ArrayList<>();
+        pageIds = new ArrayList<>();
 
         if(name == null) {
-            // make temp HeapFile w/o DB entry
             this.temporary = true;
-            this.name = ("tmp_" + tmpSuffix);
-            tmpSuffix++;
-
             this.fPageId = new PageId();
             this.fPage = new Page();
 
@@ -52,22 +53,26 @@ public class HeapFile implements GlobalConst {
         } else {
             // create a new empty file
             this.numRecords = 0;
-            this.temporary = false;
             this.name = name;
 
             this.fPageId = Minibase.DiskManager.get_file_entry(name);
 
-            // If file doesn't exist, make a new one
+            // If file doesn't exist, make a new (temporary?) one
             if (fPageId == null) {
+                this.temporary = true;
                 this.fPageId = new PageId();
                 this.fPage = new Page();
 
-                try {
-                    this.fPageId = Minibase.BufferManager.newPage(this.fPage, 1);
-                } catch (Exception e) {
-                    // TODO: Verify this is correct
-                }
+                // Use the given name since it already doesn't exist
+                Minibase.DiskManager.add_file_entry(this.name, this.fPageId);
+
+                // TODO: Check if this behavior is correct
+                Minibase.DiskManager.read_page(this.fPageId, this.fPage);
             }
+
+            // Add page and pageId to arrays
+            this.pages.add(this.fPage);
+            this.pageIds.add(this.fPageId);
 
             // Add allocated page to heap file
             this.hfPage.setCurPage(this.fPageId);
@@ -79,19 +84,28 @@ public class HeapFile implements GlobalConst {
      * object; deletes the heap file if it's temporary.
      */
     protected void finalize() throws Throwable {
-        //PUT YOUR CODE HERE
-        if(this.temporary) {
-            // TODO delete heapFile
-        }
+        // TODO delete heapFile
     }
 
     /**
      * Deletes the heap file from the database, freeing all of its pages.
      */
-    public void deleteFile() {
-        //PUT YOUR CODE HERE
-        // TODO free all pages
-        // TODO delete heapFile
+    public void deleteFile() throws ChainException {
+        // TODO: free all pages
+
+        for (int i = 0; i < pageIds.size(); i++) {
+            try {
+                Minibase.BufferManager.freePage(pageIds.get(i));
+            } catch (Exception e) {
+                throw new ChainException(null, "HeapFile.deleteFile: Failed to free page");
+            }
+        }
+
+        numRecords = 0;
+        pages.clear();
+        pageIds.clear();
+
+        // Delete heap file itself?
     }
 
     /**
@@ -122,19 +136,22 @@ public class HeapFile implements GlobalConst {
      *
      * @throws IllegalArgumentException if the rid is invalid
      */
-    public Tuple getRecord(RID rid) throws Exception {
-        //PUT YOUR CODE HERE
-        // if invalid RID, throw IllegalArgumentException
+    public Tuple getRecord(RID rid) throws ChainException {
+        byte[] record;
+        short offset;
+        short length;
+
+        // TODO: Check arguments
+
         try {
-            if(/*rid is invalid*/) {
-                throw new IllegalArgumentException("invalid rid argument");
-            }
-            // TODO get Tuple from rid
-            return null;  // TODO return Tuple, not null
-        } catch(IllegalArgumentException e) {
-            e.printStackTrace();
+            record = this.hfPage.selectRecord(rid);
+            offset = this.hfPage.getSlotOffset(rid.slotno);
+            length = this.hfPage.checkRID(rid);
+        } catch(Exception e) {
+            throw new ChainException(null, "HeapFile.getRecord: Failed to retrieve record from HFPage");
         }
-        return null;
+
+        return new Tuple(record, offset, length);
     }
 
     /**
@@ -142,8 +159,9 @@ public class HeapFile implements GlobalConst {
      *
      * @throws IllegalArgumentException if the rid or new record is invalid
      */
-    public boolean updateRecord(RID rid, Tuple newRecord) throws Exception {
-        //PUT YOUR CODE HERE
+    public boolean updateRecord(RID rid, Tuple newRecord) throws ChainException {
+        // TODO: Check arguments
+
         try {
             if(/*rid is invalid*/) {
                 throw new IllegalArgumentException("invalid rid argument");
@@ -166,7 +184,8 @@ public class HeapFile implements GlobalConst {
      * @throws IllegalArgumentException if the rid is invalid
      */
     public boolean deleteRecord(RID rid) throws IllegalArgumentException {
-        //PUT YOUR CODE HERE
+        // TODO: Check arguments
+
         try {
             //if RID is invalid, throw IllegalArgumentException
             if(/*rid is invalid*/) {
