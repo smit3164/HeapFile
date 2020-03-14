@@ -27,7 +27,6 @@ public class HeapFile implements GlobalConst {
     private PageId fPageId;
     private Page fPage;
     private HFPage hfPage;
-
     private ArrayList<PageId> pageIds;
 
     public HeapFile(String name) {
@@ -107,8 +106,6 @@ public class HeapFile implements GlobalConst {
      * Deletes the heap file from the database, freeing all of its pages.
      */
     public void deleteFile() throws ChainException {
-        // TODO: free all pages
-
         for (int i = 0; i < pageIds.size(); i++) {
             try {
                 Minibase.BufferManager.freePage(pageIds.get(i));
@@ -119,8 +116,10 @@ public class HeapFile implements GlobalConst {
 
         numRecords = 0;
         pageIds.clear();
+        hfPage = null;
 
-        // Delete heap file itself?
+        // TODO: Check this functionality
+        Minibase.DiskManager.delete_file_entry(this.name);
     }
 
     /**
@@ -206,8 +205,16 @@ public class HeapFile implements GlobalConst {
             throw new IllegalArgumentException("HeapFile.deleteRecord: Invalid RID");
         }
 
+        Page page = new Page();
+        HFPage hf = new HFPage();
+
         try {
-            this.hfPage.updateRecord(rid, newRecord);
+            Minibase.BufferManager.pinPage(rid.pageno, page, false);
+
+            hf.copyPage(page);
+            hf.updateRecord(rid, newRecord);
+
+            Minibase.BufferManager.unpinPage(rid.pageno, true);
         } catch (Exception e) {
             return false;
         }
@@ -225,25 +232,27 @@ public class HeapFile implements GlobalConst {
             throw new IllegalArgumentException("HeapFile.deleteRecord: Invalid RID");
         }
 
+        Page page = new Page();
+        HFPage hf = new HFPage();
+
         try {
-            //if RID is invalid, throw IllegalArgumentException
-            if(/*rid is invalid*/) {
-                throw new IllegalArgumentException("invalid rid argument");
-            }
-            // TODO delete record from heapFile
-            this.numRecords--;
+            Minibase.BufferManager.pinPage(rid.pageno, page, false);
+
+            hf.copyPage(page);
+            hf.deleteRecord(rid);
+
+            Minibase.BufferManager.unpinPage(rid.pageno, true);
+            numRecords--;
             return true;
-        } catch(IllegalArgumentException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            return false;
         }
-        return false;
     }
 
     /**
      * Gets the number of records in the file.
      */
     public int getRecCnt() {
-        //PUT YOUR CODE HERE
         return this.numRecords;
     }
 
@@ -258,8 +267,7 @@ public class HeapFile implements GlobalConst {
      * Returns the name of the heap file.
      */
     public String toString() {
-        //PUT YOUR CODE HERE
         return this.name;
     }
 
-} // public class HeapFile implements GlobalConst
+}
